@@ -73,14 +73,10 @@ source venv/bin/activate
 
 ### 4. Install Dependencies
 
-```bash
-# Backend dependencies
-cd backend
-pip install -r requirements.txt
+With the virtual environment active, install all project dependencies from the single requirements file (covers backend + frontend):
 
-# Frontend dependencies (in a separate terminal/venv, or after installing backend)
-cd ../frontend
-pip install -r requirements.txt
+```bash
+pip install -r backend/requirements.txt
 ```
 
 ### 5. Configure Environment
@@ -96,8 +92,9 @@ NPS_API_KEY=your_api_key_here
 ```bash
 cd database
 python create_db.py          # Creates empty nps.db with schema
+# Make sure to run fetch_data.py first then load_csv.py second
 cd ../backend
-python fetch_data.py         # Fetches ~474 parks + boundaries from NPS API
+python fetch_data.py         # Fetches ~474 parks + boundaries from NPS API, this step may take a few minutes 
 python load_csv.py           # Loads monthly visit data from CSV
 ```
 
@@ -108,15 +105,20 @@ cd backend
 python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Backend will be available at `http://127.0.0.1:8000`
-- API docs: `http://127.0.0.1:8000/docs`
+Backend will be available at `http://127.0.0.1:8000/docs`
 
 ### 8. Start Frontend
 
+From the project root, run:
+
 ```bash
-cd frontend
-streamlit run app.py
+python -m streamlit run frontend/app.py
 ```
+
+**Alternative commands** (if `streamlit` is on PATH):
+- Windows: `streamlit run .\frontend\app.py`
+- macOS/Linux: `streamlit run ./frontend/app.py`
+- Or: `cd frontend` then `streamlit run app.py`
 
 Frontend will open at `http://localhost:8501`
 
@@ -268,13 +270,6 @@ No automated tests in current version. Manual testing recommended:
 - Verify sorting is by metric value (not region)
 - Check park filtering works globally
 - Confirm map loads and renders boundaries
-
-## Contributing
-
-1. Create a feature branch: `git checkout -b feature/your-feature`
-2. Make changes and test locally
-3. Commit with clear messages: `git commit -m "Add query 11 endpoint"`
-4. Push and open a pull request
 
 ## License
 
