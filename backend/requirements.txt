@@ -1,0 +1,10 @@
+fastapi>=0.104.0
+sqlmodel>=0.0.14
+uvicorn>=0.24.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+streamlit>=1.28.0
+plotly>=5.17.0
+folium>=0.20.0
+streamlit-folium>=0.25.0
