@@ -6,8 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, Session, select, func
 from sqlalchemy.orm import aliased
 
-from .database import get_session
-from .models import Region, Park, MonthlyVisit
+from database import get_session
+from models import Region, Park, MonthlyVisit
 
 
 app = FastAPI(title="NPS Visitor Analytics API")
