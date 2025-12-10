@@ -1134,7 +1134,7 @@ with tab_map:
                 </div>
                 """
                 
-                folium.CircleMarker(
+                marker = folium.CircleMarker(
                     location=[row["latitude"], row["longitude"]],
                     radius=radius,
                     popup=folium.Popup(popup_html, max_width=320),
@@ -1144,22 +1144,48 @@ with tab_map:
                     fillOpacity=0.7,
                     weight=2,
                     tooltip=f"{row['park_name']} ({row['park_code']})"
-                ).add_to(m)
+                )
+                marker.add_to(m)
         
-        # Display map with key parameter to prevent reruns on interaction
-        map_data = st_folium(m, width=1200, height=600, key="main_map", returned_objects=[])
+        # Display map with key parameter and capture click events
+        map_data = st_folium(m, width=1200, height=600, key="main_map", returned_objects=["last_object_clicked"])
+        
+        # Check if a marker was clicked and update selected park
+        if map_data and map_data.get("last_object_clicked"):
+            clicked_lat = map_data["last_object_clicked"].get("lat")
+            clicked_lng = map_data["last_object_clicked"].get("lng")
+            
+            if clicked_lat and clicked_lng:
+                # Find the park that matches these coordinates
+                for _, row in df.iterrows():
+                    if abs(row["latitude"] - clicked_lat) < 0.001 and abs(row["longitude"] - clicked_lng) < 0.001:
+                        # Store the clicked park in session state
+                        st.session_state.clicked_park_code = row["park_code"]
+                        break
         
         # Show park count summary
-        st.info(f"📍 Showing {len(df)} parks")
+        st.info(f"📍 Showing {len(df)} parks | 💡 Click a marker to auto-select the park below")
         
         # Park selector for details
         st.markdown("---")
         st.subheader("Park Details & Boundary")
         
+        # Determine initial selection based on clicked park or first park
+        park_options = [(row['park_code'], row['park_name']) for _, row in df.iterrows()]
+        default_index = 0
+        
+        # If a park was clicked, find its index
+        if hasattr(st.session_state, 'clicked_park_code') and st.session_state.clicked_park_code:
+            for i, (code, name) in enumerate(park_options):
+                if code == st.session_state.clicked_park_code:
+                    default_index = i
+                    break
+        
         selected_park = st.selectbox(
             "Select a park to view details and boundary:",
-            options=[(row['park_code'], row['park_name']) for _, row in df.iterrows()],
+            options=park_options,
             format_func=lambda x: f"{x[1]} ({x[0]})",
+            index=default_index,
             key="park_detail_select"
         )
         
