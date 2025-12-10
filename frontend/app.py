@@ -14,6 +14,35 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Add keyboard shortcuts via custom JavaScript
+st.markdown("""
+<script>
+document.addEventListener('keydown', function(e) {
+    // Ctrl/Cmd + K to focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchInput = document.querySelector('input[aria-label="Search parks (global)"]');
+        if (searchInput) searchInput.focus();
+    }
+    // Ctrl/Cmd + Enter to trigger search/load buttons
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const searchBtn = Array.from(document.querySelectorAll('button')).find(btn => btn.textContent.includes('Search Parks'));
+        if (searchBtn) searchBtn.click();
+    }
+});
+</script>
+<style>
+/* Force content to resize properly when sidebar changes */
+.main .block-container {
+    max-width: 100%;
+}
+iframe {
+    width: 100% !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # API base URL
 API_BASE = "http://127.0.0.1:8000"
 
@@ -99,6 +128,23 @@ st.markdown("Analyze visitor patterns, trends, and park performance across the N
 # Sidebar controls
 st.sidebar.header("⚙️ Global Filters & Options")
 
+# Clear all filters button
+if st.sidebar.button("🔄 Clear All Filters", key="clear_filters_btn", help="Reset all filters to defaults"):
+    # Clear region selection
+    st.session_state.global_regions = []
+    # Clear park search and selection
+    if "global_matches" in st.session_state:
+        st.session_state.global_matches = []
+    if "global_selected" in st.session_state:
+        st.session_state.global_selected = []
+    if "global_search" in st.session_state:
+        st.session_state.global_search = ""
+    # Clear clicked park on map
+    if "clicked_park_code" in st.session_state:
+        del st.session_state.clicked_park_code
+    st.success("✅ All filters cleared!")
+    st.rerun()
+
 @st.cache_data
 def fetch_years():
     """Fetch the min/max year available from the backend metadata endpoint."""
@@ -108,8 +154,8 @@ def fetch_years():
         return resp.json()
     except Exception:
         # Fall back to sensible defaults if backend not available yet
-        # (project has historically used 2000-2024 data)
-        return {"min_year": 2000, "max_year": 2024}
+        # (project data spans 2015-2024)
+        return {"min_year": 2015, "max_year": 2024}
 
 
 # Region/park/search controls are provided inside each query tab
@@ -126,12 +172,14 @@ def format_region_func(x):
         return "All Regions"
     return region_options.get(x, x)
 
-global_regions_display = st.sidebar.multiselect(
-    "Regions (global)",
-    options=region_display_options,
-    format_func=format_region_func,
-    key="global_regions",
-)
+# Collapsible section for Regions
+with st.sidebar.expander("🌎 Regions", expanded=True):
+    global_regions_display = st.multiselect(
+        "Select regions to filter",
+        options=region_display_options,
+        format_func=format_region_func,
+        key="global_regions",
+    )
 
 # Convert display selection to actual region keys
 if "All Regions" in global_regions_display:
@@ -139,56 +187,59 @@ if "All Regions" in global_regions_display:
 else:
     global_regions = global_regions_display
 
-# Year selection and results limit moved under Global Filters (needed before search buttons)
-years = fetch_years()
-min_year = years.get("min_year", 2022)
-max_year = years.get("max_year", 2023)
-year = st.sidebar.slider(
-    "Select Year",
-    min_value=min_year,
-    max_value=max_year,
-    value=max_year,
-    step=1,
-)
+# Collapsible section for Year and Limits
+with st.sidebar.expander("📅 Year & Limits", expanded=True):
+    years = fetch_years()
+    min_year = years.get("min_year", 2015)
+    max_year = years.get("max_year", 2024)
+    year = st.slider(
+        "Select Year",
+        min_value=min_year,
+        max_value=max_year,
+        value=max_year,
+        step=1,
+    )
+    
+    limit = st.slider("Results Limit", min_value=1, max_value=100, value=10, step=1)
 
-limit = st.sidebar.slider("Results Limit", min_value=1, max_value=100, value=10, step=1)
-
-global_search = st.sidebar.text_input("Search parks (global)", value="", key="global_search")
-col_a, col_b = st.sidebar.columns([3, 2])
-with col_a:
-    if st.button("Search Parks", key="global_search_btn"):
-        matches = fetch_parks_by_query(global_search, year)
-        st.session_state["global_matches"] = matches
-with col_b:
-    if st.button("Load Region Parks", key="global_load_region"):
-        if global_regions:
-            all_matches = []
-            for rid in global_regions:
-                try:
-                    part = fetch_parks_by_region(rid, year)
-                    all_matches.extend(part)
-                except Exception as e:
-                    st.warning(f"Failed to load parks for region {rid}: {e}")
-            # dedupe by park_code
-            seen = set()
-            uniq = []
-            for code, name in all_matches:
-                if code not in seen:
-                    seen.add(code)
-                    uniq.append((code, name))
-            st.session_state["global_matches"] = uniq
-            if uniq:
-                st.success(f"Loaded {len(uniq)} parks from {len(global_regions)} region(s)")
-        else:
-            st.warning("Select one or more regions first (Global Filters).")
-
-global_matches = st.session_state.get("global_matches", [])
-global_selected = st.sidebar.multiselect(
-    "Selected Parks",
-    options=global_matches,
-    format_func=lambda x: f"{x[1]} ({x[0]})",
-    key="global_selected",
-)
+# Collapsible section for Park Search
+with st.sidebar.expander("🔍 Park Search & Selection", expanded=False):
+    global_search = st.text_input("Search parks (global)", value="", key="global_search", help="Press Ctrl/Cmd+K to focus")
+    col_a, col_b = st.columns([3, 2])
+    with col_a:
+        if st.button("Search Parks", key="global_search_btn", help="Or press Ctrl/Cmd+Enter"):
+            matches = fetch_parks_by_query(global_search, year)
+            st.session_state["global_matches"] = matches
+    with col_b:
+        if st.button("Load Region Parks", key="global_load_region"):
+            if global_regions:
+                all_matches = []
+                for rid in global_regions:
+                    try:
+                        part = fetch_parks_by_region(rid, year)
+                        all_matches.extend(part)
+                    except Exception as e:
+                        st.warning(f"Failed to load parks for region {rid}: {e}")
+                # dedupe by park_code
+                seen = set()
+                uniq = []
+                for code, name in all_matches:
+                    if code not in seen:
+                        seen.add(code)
+                        uniq.append((code, name))
+                st.session_state["global_matches"] = uniq
+                if uniq:
+                    st.success(f"Loaded {len(uniq)} parks from {len(global_regions)} region(s)")
+            else:
+                st.warning("Select one or more regions first (Global Filters).")
+    
+    global_matches = st.session_state.get("global_matches", [])
+    global_selected = st.multiselect(
+        "Selected Parks",
+        options=global_matches,
+        format_func=lambda x: f"{x[1]} ({x[0]})",
+        key="global_selected",
+    )
 
 selected_park_codes = [p[0] for p in global_selected] if global_selected else []
 
@@ -1148,7 +1199,7 @@ with tab_map:
                 marker.add_to(m)
         
         # Display map with key parameter and capture click events
-        map_data = st_folium(m, width=1200, height=600, key="main_map", returned_objects=["last_object_clicked"])
+        map_data = st_folium(m, width=None, height=600, key="main_map", returned_objects=["last_object_clicked"])
         
         # Check if a marker was clicked and update selected park
         if map_data and map_data.get("last_object_clicked"):
