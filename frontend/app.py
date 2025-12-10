@@ -408,6 +408,9 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by the metric (descending) to mix regions
                     df = df.sort_values("annual_total_visits", ascending=False)
+                    # Apply limit to final results for multi-region queries
+                    if len(global_regions) > 1:
+                        df = df.head(limit)
                     display_cols = [col for col in ["park_name", "region_name", "annual_total_visits"] if col in df.columns]
                     st.dataframe(df[display_cols], use_container_width=True)
                     fig = px.bar(
@@ -491,6 +494,9 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by the metric (descending) to mix regions
                     df = df.sort_values("avg_monthly_visits", ascending=False)
+                    # Apply limit to final results for multi-region queries
+                    if len(global_regions) > 1:
+                        df = df.head(limit)
                     display_cols = [col for col in ["park_name", "region_name", "avg_monthly_visits"] if col in df.columns]
                     st.dataframe(df[display_cols], use_container_width=True)
                     fig = px.bar(
@@ -566,6 +572,9 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by the metric (descending) to mix regions
                     df = df.sort_values("avg_monthly_visits", ascending=False)
+                    # Apply limit to final results for multi-region queries
+                    if len(global_regions) > 1:
+                        df = df.head(limit)
                     display_cols = [col for col in ["park_name", "region_name", "avg_monthly_visits"] if col in df.columns]
                     st.dataframe(df[display_cols], use_container_width=True)
                     st.session_state["q4_data"] = df.to_dict(orient="records")
@@ -616,6 +625,8 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by the metric (descending) to mix regions
                     df = df.sort_values("annual_total_visits", ascending=False)
+                    # Apply limit to final results
+                    df = df.head(limit)
                     display_cols = [col for col in ["park_name", "region_name", "annual_total_visits", "percent_above_average"] if col in df.columns]
                     st.dataframe(df[display_cols], use_container_width=True)
                     fig = px.scatter(
@@ -683,6 +694,9 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by the metric (descending) to mix regions
                     df = df.sort_values("annual_total_visits", ascending=False)
+                    # Apply limit to final results for multi-region queries
+                    if len(global_regions) > 1:
+                        df = df.head(limit)
                     display_cols = [col for col in ["park_name", "region_name", "annual_total_visits"] if col in df.columns]
                     st.dataframe(df[display_cols], use_container_width=True)
                     fig = px.bar(
@@ -889,8 +903,16 @@ with tab_main:
                     "limit": limit,
                 }
                 if not global_regions:
-                    st.warning("Select one or more regions in Global Filters to run Q9.")
-                    data = []
+                    # Fetch all regions when none selected (like other queries)
+                    combined = []
+                    for rid in all_region_keys:
+                        try:
+                            r = requests.get(f"{API_BASE}/regions/{rid}/growth", params=params)
+                            r.raise_for_status()
+                            combined.extend(r.json())
+                        except Exception:
+                            continue
+                    data = combined
                 elif len(global_regions) == 1:
                     region_for_q9 = global_regions[0]
                     resp = requests.get(f"{API_BASE}/regions/{region_for_q9}/growth", params=params)
@@ -912,6 +934,8 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by growth_percent descending to mix regions
                     df = df.sort_values("growth_percent", ascending=False)
+                    # Apply limit to final results
+                    df = df.head(limit)
                     st.dataframe(df, use_container_width=True)
                     fig = px.bar(
                         df,
@@ -1032,6 +1056,9 @@ with tab_main:
                         df = df[df["park_code"].isin(selected_park_codes)]
                     # Sort by metric_total descending to mix regions
                     df = df.sort_values("metric_total", ascending=False)
+                    # Apply limit to final results for multi-region queries
+                    if len(global_regions) > 1:
+                        df = df.head(limit)
                     st.dataframe(df, use_container_width=True)
                     fig = px.bar(
                         df,
